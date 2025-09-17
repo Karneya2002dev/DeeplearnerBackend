@@ -146,6 +146,52 @@ app.post("/api/enroll", async (req, res) => {
     res.status(500).json({ success: false, message: "Error saving enrollment" });
   }
 });
+app.post("/api/enroll", async (req, res) => {
+  const { name, email, phone, status = "Pending", courseId } = req.body;
+
+  if (!name || !email || !phone || !courseId) {
+    return res.status(400).json({ success: false, message: "All fields are required" });
+  }
+
+  try {
+    // Insert into DB
+    const [result] = await db.query(
+      "INSERT INTO enrollments (name, email, phone, status, course_id) VALUES (?, ?, ?, ?, ?)",
+      [name, email, phone, status, courseId]
+    );
+
+    // Send admin mail
+    await sendMail(
+      "deeplearneracademy@gmail.com",
+      "📩 New Enrollment",
+      `<h2>${name} enrolled in Course ID: ${courseId}</h2>
+       <p>Email: ${email}</p>
+       <p>Phone: ${phone}</p>
+       <p>Status: ${status}</p>`
+    );
+
+    // Send confirmation to student
+    await sendMail(
+      email,
+      "✅ Enrollment Successful",
+      `<h2>Hi ${name},</h2>
+       <p>You are successfully enrolled in course ID: ${courseId}! 🎉</p>
+       <p>Our team will contact you soon.</p>
+       <br/>- Deep Learner Academy Team`
+    );
+
+    // ✅ Response to client
+    res.status(201).json({
+      success: true,
+      message: "Enrollment successful, confirmation email sent",
+      enrollmentId: result.insertId,
+    });
+
+  } catch (error) {
+    console.error("Enrollment Error:", error);
+    res.status(500).json({ success: false, message: "Server error, please try again later" });
+  }
+});
 
 // ------------------ USERS ------------------
 app.get("/api/users", async (req, res) => {
